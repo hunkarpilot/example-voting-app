@@ -1,105 +1,86 @@
 resource "aws_eks_cluster" "this" {
-  name = "talent-${var.candidate_id}-cluster"
-
-  access_config {
-    authentication_mode = "API_AND_CONFIG_MAP"
-  }
-
+  name     = local.name
   role_arn = var.eks_cluster_role_arn
-  version  = "1.33"
+  version  = "1.31"
 
   vpc_config {
-    subnet_ids = module.vpc.private_subnets
+    subnet_ids              = module.vpc.private_subnets
+    endpoint_public_access  = true
+    endpoint_private_access = true
   }
 
-  # Ensure that IAM Role permissions are created before and deleted
-  # after EKS Cluster handling. Otherwise, EKS will not be able to
-  # properly delete EKS managed EC2 infrastructure such as Security Groups.
-  depends_on = [
-    aws_iam_role_policy_attachment.cluster_AmazonEKSClusterPolicy,
-  ]
+  access_config {
+    authentication_mode                         = "API_AND_CONFIG_MAP"
+    bootstrap_cluster_creator_admin_permissions = false
+  }
+
+  tags = local.tags
 }
 
-resource "aws_iam_role" "cluster" {
-  name = "eks-cluster-${var.candidate_id}"
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = [
-          "sts:AssumeRole",
-          "sts:TagSession"
-        ]
-        Effect = "Allow"
-        Principal = {
-          Service = "eks.amazonaws.com"
-        }
-      },
-    ]
-  })
-}
-
-resource "aws_iam_role_policy_attachment" "cluster_AmazonEKSClusterPolicy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSClusterPolicy"
-  role       = aws_iam_role.cluster.name
-}
-
-resource "aws_eks_node_group" "this" {
+resource "aws_eks_node_group" "talent" {
   cluster_name    = aws_eks_cluster.this.name
   node_group_name = "talent-${var.candidate_id}-ng"
   node_role_arn   = var.eks_node_role_arn
   subnet_ids      = module.vpc.private_subnets
-  version         = aws_eks_cluster.this.version
-  release_version = data.aws_ssm_parameter.eks_ami_release_version.value
 
   scaling_config {
     desired_size = 2
-    max_size     = 4
+    max_size     = 5
     min_size     = 1
   }
 
-  update_config {
-    max_unavailable = 1
+  instance_types = ["t3.medium"]
+  ami_type       = "AL2023_x86_64_STANDARD"
+
+  labels = {
+    candidate_id = var.candidate_id
   }
 
-  # Ensure that IAM Role permissions are created before and deleted after EKS Node Group handling.
-  # Otherwise, EKS will not be able to properly delete EC2 Instances and Elastic Network Interfaces.
-  depends_on = [
-    aws_iam_role_policy_attachment.node_AmazonEKSWorkerNodePolicy,
-    aws_iam_role_policy_attachment.node_AmazonEKS_CNI_Policy,
-    aws_iam_role_policy_attachment.node_AmazonEC2ContainerRegistryReadOnly,
-  ]
-}
-data "aws_ssm_parameter" "eks_ami_release_version" {
-  name = "/aws/service/eks/optimized-ami/${aws_eks_cluster.this.version}/amazon-linux-2023/x86_64/standard/recommended/release_version"
+  tags = local.tags
 }
 
-resource "aws_iam_role" "node" {
-  name = "eks-node-group-${var.candidate_id}"
-
-  assume_role_policy = jsonencode({
-    Statement = [{
-      Action = "sts:AssumeRole"
-      Effect = "Allow"
-      Principal = {
-        Service = "ec2.amazonaws.com"
-      }
-    }]
-    Version = "2012-10-17"
-  })
+resource "aws_eks_addon" "coredns" {
+  cluster_name                = aws_eks_cluster.this.name
+  addon_name                  = "coredns"
+  resolve_conflicts_on_create = "OVERWRITE"
+  tags                        = local.tags
 }
 
-resource "aws_iam_role_policy_attachment" "node_AmazonEKSWorkerNodePolicy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKSWorkerNodePolicy"
-  role       = aws_iam_role.node.name
+resource "aws_eks_addon" "kube_proxy" {
+  cluster_name                = aws_eks_cluster.this.name
+  addon_name                  = "kube-proxy"
+  resolve_conflicts_on_create = "OVERWRITE"
+  tags                        = local.tags
 }
 
-resource "aws_iam_role_policy_attachment" "node_AmazonEKS_CNI_Policy" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEKS_CNI_Policy"
-  role       = aws_iam_role.node.name
+resource "aws_eks_addon" "vpc_cni" {
+  cluster_name                = aws_eks_cluster.this.name
+  addon_name                  = "vpc-cni"
+  resolve_conflicts_on_create = "OVERWRITE"
+  tags                        = local.tags
 }
 
-resource "aws_iam_role_policy_attachment" "node_AmazonEC2ContainerRegistryReadOnly" {
-  policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
-  role       = aws_iam_role.node.name
+resource "aws_eks_addon" "eks_pod_identity_agent" {
+  cluster_name                = aws_eks_cluster.this.name
+  addon_name                  = "eks-pod-identity-agent"
+  resolve_conflicts_on_create = "OVERWRITE"
+  tags                        = local.tags
+}
+
+resource "aws_eks_access_entry" "talent_admin" {
+  cluster_name  = aws_eks_cluster.this.name
+  principal_arn = "arn:aws:iam::130575395405:role/talent_role"
+  type          = "STANDARD"
+
+  tags = local.tags
+}
+
+resource "aws_eks_access_policy_association" "talent_admin" {
+  cluster_name  = aws_eks_cluster.this.name
+  principal_arn = aws_eks_access_entry.talent_admin.principal_arn
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+
+  access_scope {
+    type = "cluster"
+  }
 }

@@ -3,7 +3,7 @@ locals {
   cluster_name = local.name
 
   vpc_cidr = "10.0.0.0/16"
-  azs      = slice(data.aws_availability_zones.available.names, 0, 3)
+  azs      = ["eu-west-2a", "eu-west-2b", "eu-west-2c"]
 
   repos = [
     "bion-talent-${var.candidate_id}-voting-app",
@@ -19,9 +19,9 @@ locals {
 }
 
 variable "eks_cluster_role_arn" {
-  default = "arn:aws:iam::130575395405:role/bion-talent-eks-cluster-role"
+  default = "arn:aws:iam::904976121950:role/bion-talent-eks-cluster-role"
 }
 
 variable "eks_node_role_arn" {
-  default = "arn:aws:iam::130575395405:role/bion-talent-eks-node-role"
+  default = "arn:aws:iam::904976121950:role/bion-talent-eks-node-role"
 }
