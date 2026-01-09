@@ -4,13 +4,14 @@ metadata:
   labels:
     app: vote
   name: vote
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: "candidate_id=904976121950"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
 spec:
-  type: NodePort
+  type: LoadBalancer
   ports:
   - name: "vote-service"
-    port: 8080
+    port: 80
     targetPort: 80
-    nodePort: 31000
   selector:
     app: vote
-  

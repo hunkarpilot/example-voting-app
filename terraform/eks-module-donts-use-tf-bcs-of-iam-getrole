@@ -1,0 +1,73 @@
+module "eks_al2023" {
+  source  = "terraform-aws-modules/eks/aws"
+  version = "~> 21.0"
+
+  name                   = local.name
+  kubernetes_version     = "1.31"
+  endpoint_public_access = true
+  authentication_mode    = "API_AND_CONFIG_MAP"
+
+  # Disable this to avoid iam:GetRole error (sandbox doesn't allow this permission)
+  enable_cluster_creator_admin_permissions = false
+
+  # Use pre-created IAM roles from sandbox
+  create_iam_role = false
+  iam_role_arn    = var.eks_cluster_role_arn
+
+  vpc_id     = module.vpc.vpc_id
+  subnet_ids = module.vpc.private_subnets
+
+  addons = {
+    coredns = {
+      most_recent = true
+    }
+    kube-proxy = {
+      most_recent = true
+    }
+    vpc-cni = {
+      most_recent = true
+    }
+    eks-pod-identity-agent = {
+      most_recent = true
+    }
+  }
+
+  eks_managed_node_groups = {
+    talent = {
+      name           = "talent-${var.candidate_id}-ng"
+      instance_types = ["t3.medium"]
+      ami_type       = "AL2023_x86_64_STANDARD"
+
+      min_size     = 1
+      max_size     = 5
+      desired_size = 2
+
+      create_iam_role = false
+      iam_role_arn    = var.eks_node_role_arn
+
+      labels = {
+        candidate_id = var.candidate_id
+      }
+    }
+  }
+
+  # # Grant access to talent_role for kubectl access
+  # access_entries = {
+  #   talent_admin = {
+  #     principal_arn = "arn:aws:iam::130575395405:role/talent_role"
+  #     type          = "STANDARD"
+
+  #     policy_associations = {
+  #       admin = {
+  #         policy_arn = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+  #         access_scope = {
+  #           type = "cluster"
+  #         }
+  #       }
+  #     }
+  #   }
+  # }
+
+  tags = local.tags
+}
+

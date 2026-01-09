@@ -1,0 +1,196 @@
+name: Build and Deploy to EKS
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  AWS_REGION: eu-west-2
+  ECR_REGISTRY: 130575395405.dkr.ecr.eu-west-2.amazonaws.com
+  EKS_CLUSTER_NAME: talent-904976121950
+  CANDIDATE_ID: "904976121950"
+
+jobs:
+  build-vote:
+    name: Build Vote App
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.build.outputs.image_tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::130575395405:role/talent_role
+          role-session-name: GithubActionsSession
+          role-duration-seconds: 3600
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push Vote image
+        id: build
+        working-directory: ./vote
+        run: |
+          IMAGE_TAG="${GITHUB_SHA::8}"
+          FULL_IMAGE="${ECR_REGISTRY}/bion-talent-${CANDIDATE_ID}-voting-app:${IMAGE_TAG}"
+          
+          docker build -t $FULL_IMAGE .
+          docker push $FULL_IMAGE
+          
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          echo "✅ Pushed Vote image: ${FULL_IMAGE}"
+
+  build-result:
+    name: Build Result App
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.build.outputs.image_tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::130575395405:role/talent_role
+          role-session-name: GithubActionsSession
+          role-duration-seconds: 3600
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push Result image
+        id: build
+        working-directory: ./result
+        run: |
+          IMAGE_TAG="${GITHUB_SHA::8}"
+          FULL_IMAGE="${ECR_REGISTRY}/bion-talent-${CANDIDATE_ID}-result-app:${IMAGE_TAG}"
+          
+          docker build -t $FULL_IMAGE .
+          docker push $FULL_IMAGE
+          
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          echo "✅ Pushed Result image: ${FULL_IMAGE}"
+
+  build-worker:
+    name: Build Worker App
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.build.outputs.image_tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::130575395405:role/talent_role
+          role-session-name: GithubActionsSession
+          role-duration-seconds: 3600
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push Worker image
+        id: build
+        working-directory: ./worker
+        run: |
+          IMAGE_TAG="${GITHUB_SHA::8}"
+          FULL_IMAGE="${ECR_REGISTRY}/bion-talent-${CANDIDATE_ID}-worker:${IMAGE_TAG}"
+          
+          docker build -t $FULL_IMAGE .
+          docker push $FULL_IMAGE
+          
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          echo "✅ Pushed Worker image: ${FULL_IMAGE}"
+
+  deploy:
+    name: Deploy to EKS
+    runs-on: ubuntu-latest
+    needs: [build-vote, build-result, build-worker]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: arn:aws:iam::130575395405:role/talent_role
+          role-session-name: GithubActionsSession
+          role-duration-seconds: 3600
+
+      - name: Update kubeconfig
+        run: |
+          aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Replace image tags in manifests
+        run: |
+          IMAGE_TAG="${{ needs.build-vote.outputs.image_tag }}"
+          echo "📦 Deploying with image tag: ${IMAGE_TAG}"
+          
+          # Replace IMAGE_TAG placeholder with actual tag in all deployment files
+          sed -i "s/IMAGE_TAG/${IMAGE_TAG}/g" k8s-specifications/vote-deployment.yaml
+          sed -i "s/IMAGE_TAG/${IMAGE_TAG}/g" k8s-specifications/result-deployment.yaml
+          sed -i "s/IMAGE_TAG/${IMAGE_TAG}/g" k8s-specifications/worker-deployment.yaml
+
+      - name: Deploy to Kubernetes
+        run: |
+          echo "🚀 Deploying application to EKS..."
+          kubectl apply -f k8s-specifications/
+          
+          echo "⏳ Waiting for deployments to be ready..."
+          kubectl rollout status deployment/vote --timeout=300s
+          kubectl rollout status deployment/result --timeout=300s
+          kubectl rollout status deployment/worker --timeout=300s
+          kubectl rollout status deployment/redis --timeout=300s
+          kubectl rollout status deployment/db --timeout=300s
+
+      - name: Get LoadBalancer URLs
+        run: |
+          echo "🔗 Getting LoadBalancer DNS names..."
+          echo ""
+          echo "================================================"
+          echo "📊 APPLICATION ACCESS ENDPOINTS"
+          echo "================================================"
+          echo ""
+          
+          # Wait for LoadBalancer to be assigned
+          sleep 30
+          
+          VOTE_URL=$(kubectl get svc vote -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "pending")
+          RESULT_URL=$(kubectl get svc result -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "pending")
+          
+          echo "🗳️  Vote App:   http://${VOTE_URL}"
+          echo "📈 Result App: http://${RESULT_URL}"
+          echo ""
+          echo "================================================"
+          echo ""
+          
+          # Show all services
+          echo "📋 All Services:"
+          kubectl get svc
+          echo ""
+          
+          # Show all pods
+          echo "📋 All Pods:"
+          kubectl get pods
