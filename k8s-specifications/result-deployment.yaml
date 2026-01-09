@@ -15,8 +15,21 @@ spec:
         app: result
     spec:
       containers:
-      - image: dockersamples/examplevotingapp_result
-        name: result
+      - name: result
+        image: 130575395405.dkr.ecr.eu-west-2.amazonaws.com/bion-talent-904976121950-result-app:IMAGE_TAG
         ports:
         - containerPort: 80
           name: result
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "128Mi"
+            cpu: "250m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10

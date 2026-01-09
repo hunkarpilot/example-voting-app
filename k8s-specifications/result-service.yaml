@@ -4,12 +4,14 @@ metadata:
   labels:
     app: result
   name: result
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-additional-resource-tags: "candidate_id=904976121950"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
 spec:
-  type: NodePort
+  type: LoadBalancer
   ports:
   - name: "result-service"
-    port: 8081
+    port: 80
     targetPort: 80
-    nodePort: 31001
   selector:
     app: result

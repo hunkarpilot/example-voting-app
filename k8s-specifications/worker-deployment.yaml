@@ -15,5 +15,12 @@ spec:
         app: worker
     spec:
       containers:
-      - image: dockersamples/examplevotingapp_worker
-        name: worker
+      - name: worker
+        image: 130575395405.dkr.ecr.eu-west-2.amazonaws.com/bion-talent-904976121950-worker:IMAGE_TAG
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "500m"
