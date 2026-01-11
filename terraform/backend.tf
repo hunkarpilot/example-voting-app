@@ -1,19 +1,14 @@
 terraform {
   required_version = ">= 1.3.2"
 
-  backend "s3" {
-    bucket       = "terraform-states-904976121950"
-    profile      = "default"
-    key          = "bion-case-904976121950"
-    region       = "eu-central-1"
-    encrypt      = true
-    use_lockfile = true
+  backend "local" {
+    path = "terraform.tfstate"
   }
 
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = ">= 6.0"
+      version = ">= 5.0"
     }
   }
 }

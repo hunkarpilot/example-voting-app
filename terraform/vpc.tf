@@ -13,6 +13,11 @@ module "vpc" {
   enable_nat_gateway = true
   single_nat_gateway = true
 
+  # Disable managing default resources due to permission boundaries
+  manage_default_network_acl    = false
+  manage_default_route_table    = false
+  manage_default_security_group = false
+
   public_subnet_tags = {
     "kubernetes.io/role/elb" = 1
   }

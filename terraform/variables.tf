@@ -13,15 +13,16 @@ locals {
 
   tags = {
     candidate_id = var.candidate_id
-    enviroment   = "case"
-    owner        = "hunkardoner"
+    Purpose      = "candidate-assignment"
+    Owner        = "candidate-hunkardoner"
+    Expires      = "2026-01-12"
   }
 }
 
 variable "eks_cluster_role_arn" {
-  default = "arn:aws:iam::904976121950:role/bion-talent-eks-cluster-role"
+  default = "arn:aws:iam::130575395405:role/bion-talent-eks-cluster-role"
 }
 
 variable "eks_node_role_arn" {
-  default = "arn:aws:iam::904976121950:role/bion-talent-eks-node-role"
+  default = "arn:aws:iam::130575395405:role/bion-talent-eks-node-role"
 }

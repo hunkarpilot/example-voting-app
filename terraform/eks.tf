@@ -29,7 +29,7 @@ resource "aws_eks_node_group" "talent" {
     min_size     = 1
   }
 
-  instance_types = ["t3.medium"]
+  instance_types = ["t3.xlarge"]
   ami_type       = "AL2023_x86_64_STANDARD"
 
   labels = {
@@ -44,6 +44,7 @@ resource "aws_eks_addon" "coredns" {
   addon_name                  = "coredns"
   resolve_conflicts_on_create = "OVERWRITE"
   tags                        = local.tags
+  depends_on = [ aws_eks_node_group.talent ]
 }
 
 resource "aws_eks_addon" "kube_proxy" {
@@ -51,6 +52,7 @@ resource "aws_eks_addon" "kube_proxy" {
   addon_name                  = "kube-proxy"
   resolve_conflicts_on_create = "OVERWRITE"
   tags                        = local.tags
+  depends_on = [ aws_eks_node_group.talent ]
 }
 
 resource "aws_eks_addon" "vpc_cni" {
@@ -58,6 +60,7 @@ resource "aws_eks_addon" "vpc_cni" {
   addon_name                  = "vpc-cni"
   resolve_conflicts_on_create = "OVERWRITE"
   tags                        = local.tags
+  depends_on = [ aws_eks_node_group.talent ]
 }
 
 resource "aws_eks_addon" "eks_pod_identity_agent" {
@@ -65,6 +68,7 @@ resource "aws_eks_addon" "eks_pod_identity_agent" {
   addon_name                  = "eks-pod-identity-agent"
   resolve_conflicts_on_create = "OVERWRITE"
   tags                        = local.tags
+  depends_on = [ aws_eks_node_group.talent ]
 }
 
 resource "aws_eks_access_entry" "talent_admin" {
