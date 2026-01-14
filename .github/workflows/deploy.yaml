@@ -54,6 +54,7 @@ jobs:
           echo "✅ Pushed ${{ matrix.app }} image: ${FULL_IMAGE}"
 
       - name: Scan image
+        id: scan-image
         working-directory: ./${{ matrix.app }}
         run: |
           IMAGE_TAG="${GITHUB_SHA::8}"
