@@ -58,6 +58,7 @@ jobs:
         with:
           image: "${{ env.FULL_IMAGE }}"      
           output-file: "${{ env.FULL_IMAGE }}.json"
+          output-format: "json"
 
       # - name: Scan status (failed)
       #   uses: shallwefootball/s3-upload-action@master
