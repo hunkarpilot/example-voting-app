@@ -52,7 +52,11 @@ jobs:
           docker push $FULL_IMAGE
           
           echo "✅ Pushed ${{ matrix.app }} image: ${FULL_IMAGE}"
-
+      - name: Scan before deploy
+        uses: anchore/scan-action@v6
+        with:
+          image: $FULL_IMAGE
+          
   deploy:
     name: Deploy to EKS
     runs-on: ubuntu-latest
