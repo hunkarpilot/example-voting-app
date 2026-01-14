@@ -52,10 +52,21 @@ jobs:
           docker push $FULL_IMAGE
           
           echo "✅ Pushed ${{ matrix.app }} image: ${FULL_IMAGE}"
-      - name: Scan before deploy
+
+      - name: Scan image
+        working-directory: ./${{ matrix.app }}
+        run: |
+          IMAGE_TAG="${GITHUB_SHA::8}"
+          REPO_NAME="bion-talent-${CANDIDATE_ID}"
+          if [ "${{ matrix.app }}" == "vote" ]; then REPO_NAME="${REPO_NAME}-voting-app"; fi
+          if [ "${{ matrix.app }}" == "result" ]; then REPO_NAME="${REPO_NAME}-result-app"; fi
+          if [ "${{ matrix.app }}" == "worker" ]; then REPO_NAME="${REPO_NAME}-worker"; fi
+          
+          FULL_IMAGE="${ECR_REGISTRY}/${REPO_NAME}:${IMAGE_TAG}"
         uses: anchore/scan-action@v6
         with:
-          image: $FULL_IMAGE
+          image: "${FULL_IMAGE}"
+          
           
   deploy:
     name: Deploy to EKS
